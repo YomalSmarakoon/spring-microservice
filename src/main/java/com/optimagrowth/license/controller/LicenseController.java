@@ -1,6 +1,6 @@
 package com.optimagrowth.license.controller;
 
-import com.optimagrowth.license.LicenseService;
+import com.optimagrowth.license.service.LicenseService;
 import com.optimagrowth.license.model.License;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;

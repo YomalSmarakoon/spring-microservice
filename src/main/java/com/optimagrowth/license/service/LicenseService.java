@@ -1,4 +1,4 @@
-package com.optimagrowth.license;
+package com.optimagrowth.license.service;
 
 import com.optimagrowth.license.model.License;
 import org.springframework.stereotype.Service;
