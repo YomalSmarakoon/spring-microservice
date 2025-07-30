@@ -6,6 +6,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Locale;
+
 /*
  * Tells Spring Boot that this is a REST based service &
  * it will automatically serialize/deserialize service requests/responses via JSON
@@ -37,9 +39,10 @@ public class LicenseController {
     @PostMapping
     public ResponseEntity<String> createLicense(
             @PathVariable("organizationId") String organizationId,
-            @RequestBody License request
-    ) {
-        return ResponseEntity.ok(licenseService.createLicense(request, organizationId));
+            @RequestBody License request,
+            @RequestHeader(value = "Accept-Language", required = false) Locale locale
+            ) {
+        return ResponseEntity.ok(licenseService.createLicense(request, organizationId, locale));
     }
 
     @PutMapping

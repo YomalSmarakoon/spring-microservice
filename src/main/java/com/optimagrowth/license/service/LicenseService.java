@@ -1,12 +1,18 @@
 package com.optimagrowth.license.service;
 
 import com.optimagrowth.license.model.License;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Service;
 
+import java.util.Locale;
 import java.util.Random;
 
 @Service
 public class LicenseService {
+
+    @Autowired
+    MessageSource messageSource;
 
     public License getLicense(String licenseId, String organizationId) {
         License license = new License();
@@ -21,12 +27,13 @@ public class LicenseService {
         return license;
     }
 
-    public String createLicense(License license, String organizationId) {
+    public String createLicense(License license, String organizationId, Locale locale) {    // Retrieve the Local as a method parameter
         String responseMessage = null;
 
         if (license != null) {
             license.setOrganizationId(organizationId);
-            responseMessage = String.format("This is the post & the object is: %s", license.toString());
+            responseMessage = String.format(messageSource.getMessage(
+                    "license.create.message", null, locale), license.toString());   // Sets the received locale to retrieve the specific message
         }
 
         return responseMessage;
@@ -37,7 +44,8 @@ public class LicenseService {
 
         if (license != null) {
             license.setOrganizationId(organizationId);
-            responseMessage = String.format("This is the put & the object is: %s", license.toString());
+            responseMessage = String.format(messageSource.getMessage(
+                    "license.update.message", null, null), license.toString());   // Sends a null locale to retrieve the specific message
         }
 
         return responseMessage;
