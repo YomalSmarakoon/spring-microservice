@@ -30,7 +30,7 @@ ostock/licensing-service        0.0.1-SNAPSHOT          906f6baeaede        Abou
 3. Start up the Licensing-service
    ` mvn spring-boot:run`
    - Build if needed.
-    ` mvn spring-boot:run`
+    ` mvn clean package -Dskiptests `
 
 ## With docker containers
 tbd
