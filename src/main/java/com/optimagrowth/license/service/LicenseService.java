@@ -1,14 +1,15 @@
 package com.optimagrowth.license.service;
 
+import com.optimagrowth.license.clients.OrganizationDiscoveryClient;
 import com.optimagrowth.license.config.ServiceConfig;
 import com.optimagrowth.license.model.License;
+import com.optimagrowth.license.model.dto.license.LicenseResponse;
+import com.optimagrowth.license.model.dto.orgnization.OrganizationResponse;
 import com.optimagrowth.license.repository.LicenseRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Service;
 
-import java.util.Locale;
-import java.util.Random;
 import java.util.UUID;
 
 @Service
@@ -22,6 +23,9 @@ public class LicenseService {
 
     @Autowired
     ServiceConfig config;
+
+    @Autowired
+    private OrganizationDiscoveryClient wbClient;
 
     public License getLicense(String licenseId, String organizationId){
         License license = licenseRepository
@@ -56,6 +60,56 @@ public class LicenseService {
                 "license.delete.message", null, null),licenseId);
         return responseMessage;
     }
+
+    public LicenseResponse getLicense(String licenseId, String organizationId, String clientType) {
+        License license = licenseRepository.findByOrganizationIdAndLicenseId(organizationId, licenseId);
+        if (null == license) {
+            throw new IllegalArgumentException(String.format(
+                    messageSource.getMessage("license.search.error.message", null, null),
+                    licenseId, organizationId));
+        }
+
+        license.withComment(config.getProperty());
+
+        LicenseResponse licenseResponse = new LicenseResponse(license);
+
+        // retrieve org info based on clientType (Feign / RestTemplate / WebClient)
+        OrganizationResponse organization = retrieveOrganizationInfo(organizationId,
+                clientType);
+
+        // populate organization fields into the license
+        if (null != organization) {
+            licenseResponse.setOrganizationName(organization.getName());
+            licenseResponse.setContactName(organization.getContactName());
+            licenseResponse.setContactEmail(organization.getContactEmail());
+            licenseResponse.setContactPhone(organization.getContactPhone());
+        }
+        return licenseResponse;
+    }
+
+
+    private OrganizationResponse retrieveOrganizationInfo(String organizationId, String clientType) {
+        switch (clientType) {
+            /*
+            * Netflix Feign Client – A declarative REST client integrated with Eureka for automatic load-balanced calls.
+            * */
+            case "feign":
+//                return organizationFeignClient.getOrganization(organizationId);
+            /*
+            * Spring Discovery Client–enabled RestTemplate – A RestTemplate enhanced to work with service discovery automatically.
+            * */
+            case "rest":
+//                return restTemplate.getForObject("http://organization-service/v1/organization/" + organizationId, Organization.class);
+            /*
+            * Spring Discovery Client – Uses DiscoveryClient and a standard RestTemplate.
+            * */
+            case "webclient":
+                return wbClient.getOrganization(organizationId);
+            default:
+                return null;
+        }
+    }
+
 
     /*
     * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

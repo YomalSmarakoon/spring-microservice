@@ -2,6 +2,7 @@ package com.optimagrowth.license;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.support.ResourceBundleMessageSource;
@@ -19,6 +20,7 @@ import java.util.ResourceBundle;
 * Not all properties are refreshed (e.g., DB configs managed by Spring Data won’t reload).
 */
 @RefreshScope
+@EnableDiscoveryClient
 public class LicensingServiceApplication {
 
 	public static void main(String[] args) {
