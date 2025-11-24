@@ -1,6 +1,7 @@
 package com.optimagrowth.license.service;
 
 import com.optimagrowth.license.clients.OrganizationDiscoveryClient;
+import com.optimagrowth.license.clients.OrganizationFeignClient;
 import com.optimagrowth.license.clients.OrganizationRestTemplateClient;
 import com.optimagrowth.license.config.ServiceConfig;
 import com.optimagrowth.license.model.License;
@@ -30,6 +31,9 @@ public class LicenseService {
 
     @Autowired
     private OrganizationRestTemplateClient restTemplateClient;
+
+    @Autowired
+    private OrganizationFeignClient organizationFeignClient;
 
     public License getLicense(String licenseId, String organizationId){
         License license = licenseRepository
@@ -98,7 +102,7 @@ public class LicenseService {
             * Netflix Feign Client – A declarative REST client integrated with Eureka for automatic load-balanced calls.
             * */
             case "feign":
-//                return organizationFeignClient.getOrganization(organizationId);
+                return organizationFeignClient.getOrganization(organizationId);
             /*
             * Spring Discovery Client–enabled RestTemplate – A RestTemplate enhanced to work with service discovery automatically.
             * */
