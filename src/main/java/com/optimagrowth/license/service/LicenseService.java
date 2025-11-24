@@ -1,6 +1,7 @@
 package com.optimagrowth.license.service;
 
 import com.optimagrowth.license.clients.OrganizationDiscoveryClient;
+import com.optimagrowth.license.clients.OrganizationRestTemplateClient;
 import com.optimagrowth.license.config.ServiceConfig;
 import com.optimagrowth.license.model.License;
 import com.optimagrowth.license.model.dto.license.LicenseResponse;
@@ -26,6 +27,9 @@ public class LicenseService {
 
     @Autowired
     private OrganizationDiscoveryClient wbClient;
+
+    @Autowired
+    private OrganizationRestTemplateClient restTemplateClient;
 
     public License getLicense(String licenseId, String organizationId){
         License license = licenseRepository
@@ -99,7 +103,7 @@ public class LicenseService {
             * Spring Discovery Client–enabled RestTemplate – A RestTemplate enhanced to work with service discovery automatically.
             * */
             case "rest":
-//                return restTemplate.getForObject("http://organization-service/v1/organization/" + organizationId, Organization.class);
+                return restTemplateClient.getOrganization(organizationId);
             /*
             * Spring Discovery Client – Uses DiscoveryClient and a standard RestTemplate.
             * */
