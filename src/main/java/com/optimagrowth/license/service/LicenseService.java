@@ -4,10 +4,13 @@ import com.optimagrowth.license.clients.OrganizationDiscoveryClient;
 import com.optimagrowth.license.clients.OrganizationFeignClient;
 import com.optimagrowth.license.clients.OrganizationRestTemplateClient;
 import com.optimagrowth.license.config.ServiceConfig;
+import com.optimagrowth.license.exception.OrganizationNotFoundException;
 import com.optimagrowth.license.model.License;
 import com.optimagrowth.license.model.dto.license.LicenseResponse;
 import com.optimagrowth.license.model.dto.orgnization.OrganizationResponse;
 import com.optimagrowth.license.repository.LicenseRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Service;
@@ -16,6 +19,8 @@ import java.util.UUID;
 
 @Service
 public class LicenseService {
+
+    private static final Logger LOG = LoggerFactory.getLogger(LicenseService.class);
 
     @Autowired
     MessageSource messageSource;
@@ -102,7 +107,12 @@ public class LicenseService {
             * Netflix Feign Client – A declarative REST client integrated with Eureka for automatic load-balanced calls.
             * */
             case "feign":
-                return organizationFeignClient.getOrganization(organizationId);
+                try {
+                    return organizationFeignClient.getOrganization(organizationId);
+                } catch (OrganizationNotFoundException ex) {
+                    LOG.error("Organization not found: {}", organizationId);
+                    return null;  // or throw the exception further
+                }
             /*
             * Spring Discovery Client–enabled RestTemplate – A RestTemplate enhanced to work with service discovery automatically.
             * */
