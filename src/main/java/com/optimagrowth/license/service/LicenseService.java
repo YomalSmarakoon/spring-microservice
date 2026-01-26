@@ -9,13 +9,18 @@ import com.optimagrowth.license.model.License;
 import com.optimagrowth.license.model.dto.license.LicenseResponse;
 import com.optimagrowth.license.model.dto.orgnization.OrganizationResponse;
 import com.optimagrowth.license.repository.LicenseRepository;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+import java.util.Random;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 
 @Service
 public class LicenseService {
@@ -43,12 +48,14 @@ public class LicenseService {
     public License getLicense(String licenseId, String organizationId){
         License license = licenseRepository
                 .findByOrganizationIdAndLicenseId(organizationId, licenseId);
+
         if (null == license) {
             throw new IllegalArgumentException(
                     String.format(messageSource.getMessage(
                                     "license.search.error.message", null, null),
                             licenseId, organizationId));
         }
+
         return license.withComment(config.getProperty());
     }
 
@@ -128,6 +135,40 @@ public class LicenseService {
         }
     }
 
+    /**
+     * <ul>
+     *     <li>Your sleep() intentionally throws a TimeoutException.</li>
+     *     <li>After enough failures, the circuit breaker becomes OPEN.</li>
+     *     <li>Once OPEN, Resilience4j throws CallNotPermittedException immediately for any further calls.</li>
+     * </ul>
+     * */
+    @CircuitBreaker(name = "licenseService")
+    public List<License> getLicensesByOrganization(String organizationId) throws InterruptedException, TimeoutException {
+        randomlyRunLong();
+        return licenseRepository.findByOrganizationId(organizationId);
+    }
+
+    /*
+    * Purposely timing out a call to the licensing service database
+    * */
+    private void randomlyRunLong() throws InterruptedException, TimeoutException {
+        /*Random rand = new Random();
+        int randomNum = rand.nextInt(3) + 1;
+        if (randomNum==3)*/
+        sleep();
+    }
+    /*private void sleep(){
+        try {
+            Thread.sleep(5000);
+            throw new java.util.concurrent.TimeoutException();
+        } catch (InterruptedException | TimeoutException e) {
+            LOG.error(e.getMessage());
+        }
+    }*/
+    private void sleep() throws TimeoutException, InterruptedException {
+        Thread.sleep(5000);
+        throw new TimeoutException("Simulated timeout");
+    }
 
     /*
     * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

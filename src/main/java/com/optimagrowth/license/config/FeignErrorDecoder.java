@@ -8,6 +8,10 @@ import org.springframework.stereotype.Component;
 
 import java.util.Locale;
 
+/*
+* So if organization-service returns 404, you throw your domain exception OrganizationNotFoundException (with an i18n message).
+* Those exceptions then bubble into Spring MVC, where your @RestControllerAdvice can convert them to JSON.
+* */
 @Component
 public class FeignErrorDecoder implements ErrorDecoder {
 

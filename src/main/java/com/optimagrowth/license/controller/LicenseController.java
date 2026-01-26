@@ -7,7 +7,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Locale;
+import java.util.List;
+import java.util.concurrent.TimeoutException;
 
 import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.linkTo;
 import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.methodOn;
@@ -31,9 +32,9 @@ public class LicenseController {
      * Also can use:
      *       @RequestMapping(value = "/{licenceId}", method = RequestMethod.GET)
      */
-    @RequestMapping(value="/{licenseId}",method = RequestMethod.GET)
-    public ResponseEntity<License> getLicense( @PathVariable("organizationId") String organizationId,
-                                               @PathVariable("licenseId") String licenseId) {
+    @RequestMapping(value = "/{licenseId}", method = RequestMethod.GET)
+    public ResponseEntity<License> getLicense(@PathVariable("organizationId") String organizationId,
+                                              @PathVariable("licenseId") String licenseId) {
 
         License license = licenseService.getLicense(licenseId, organizationId);
         license.add(
@@ -56,13 +57,13 @@ public class LicenseController {
         return ResponseEntity.ok(licenseService.createLicense(request));
     }
 
-    @DeleteMapping(value="/{licenseId}")
+    @DeleteMapping(value = "/{licenseId}")
     public ResponseEntity<String> deleteLicense(@PathVariable("licenseId") String licenseId) {
         return ResponseEntity.ok(licenseService.deleteLicense(licenseId));
     }
 
     @RequestMapping(
-            value="/{licenseId}/{clientType}",
+            value = "/{licenseId}/{clientType}",
             method = RequestMethod.GET
     )
     public LicenseResponse getLicensesWithClient(
@@ -71,5 +72,13 @@ public class LicenseController {
             @PathVariable("clientType") String clientType) {
 
         return licenseService.getLicense(licenseId, organizationId, clientType);
+    }
+
+    @RequestMapping(
+            value = "/getLicensesByOrganization", method = RequestMethod.GET)
+    public List<License> getLicensesByOrganization(
+            @PathVariable("organizationId") String organizationId) throws InterruptedException, TimeoutException {
+
+        return licenseService.getLicensesByOrganization(organizationId);
     }
 }
