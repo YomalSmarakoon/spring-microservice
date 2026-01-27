@@ -6,12 +6,39 @@ spring:
   config:
     import: optional:configserver:http://localhost:8071
 
-resilience4j:
-  circuitbreaker:
+resilience4j.circuitbreaker:
     instances:
       licenseService:
-        slidingWindowType: COUNT_BASED
-        slidingWindowSize: 3
-        minimumNumberOfCalls: 3
-        failureRateThreshold: 50
-        waitDurationInOpenState: 30s
+        registerHealthIndicator: true     # Exposes this circuit breaker via Spring Boot Actuator: Useful for monitoring (OPEN / CLOSED / HALF_OPEN)
+        # ringBufferSizeInClosedState: 5    # Legacy setting (from older Resilience4j versions). In modern versions, this is replaced by: slidingWindowSize
+                                          # If both exist:
+                                          # - slidingWindowSize wins
+                                          # - ringBufferSizeInClosedState can be ignored
+                                          # 👉 You can safely remove this in new projects.
+        ringBufferSizeInHalfOpenState: 3  # Number of trial calls allowed in HALF_OPEN state.
+                                          # When the circuit moves from OPEN → HALF_OPEN:
+                                          # - Only 3 calls are allowed
+                                          # - If they succeed → circuit closes
+                                          # - If they fail → circuit reopens
+        waitDurationInOpenState: 10s      # How long the circuit stays OPEN before trying again. After 10s → moves to HALF_OPEN
+        failureRateThreshold: 50          # Percentage of failed calls that triggers OPEN state. Example (with window size = 3):
+                                          # 2 failures out of 3 → 66% → OPEN
+                                          # 1 failure out of 3 → 33% → stays CLOSED
+        recordExceptions:                 # These exceptions are treated as failures. If one of these is thrown → failure count increases. Any exception not listed here is treated as a success unless you configure ignoreExceptions
+          - org.springframework.web.client.HttpServerErrorException
+          - java.io.IOException
+          - java.util.concurrent.TimeoutException
+          - org.springframework.web.client.ResourceAccessException
+        slidingWindowType: COUNT_BASED    # How failures are calculated.
+                                          # - COUNT_BASED → based on last N calls
+                                          # - TIME_BASED → based on last N seconds
+        slidingWindowSize: 3              # Number of calls in the evaluation window; With COUNT_BASED, this means: "Only the last 3 calls are considered."
+        minimumNumberOfCalls: 3           # CircuitBreaker won’t evaluate failures until at least 3 calls happen.
+                                          # Prevents the circuit from opening too early due to noise.
+
+      organizationService:
+        registerHealthIndicator: true
+        ringBufferSizeInClosedState: 6
+        ringBufferSizeInHalfOpenState: 4
+        waitDurationInOpenState: 20s
+        failureRateThreshold: 60
