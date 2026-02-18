@@ -9,7 +9,7 @@ import com.optimagrowth.license.model.License;
 import com.optimagrowth.license.model.dto.license.LicenseResponse;
 import com.optimagrowth.license.model.dto.orgnization.OrganizationResponse;
 import com.optimagrowth.license.repository.LicenseRepository;
-import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import com.optimagrowth.license.utils.UserContextHolder;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,10 +17,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
 public class LicenseService {
@@ -45,7 +46,9 @@ public class LicenseService {
     @Autowired
     private OrganizationFeignClient organizationFeignClient;
 
-    public License getLicense(String licenseId, String organizationId){
+    private final AtomicInteger counter = new AtomicInteger(0); // for testing retry
+
+    public License getLicense(String licenseId, String organizationId) {
         License license = licenseRepository
                 .findByOrganizationIdAndLicenseId(organizationId, licenseId);
 
@@ -59,25 +62,25 @@ public class LicenseService {
         return license.withComment(config.getProperty());
     }
 
-    public License createLicense(License license){
+    public License createLicense(License license) {
         license.setLicenseId(UUID.randomUUID().toString());
         licenseRepository.save(license);
         return license.withComment(config.getProperty());
     }
 
-    public License updateLicense(License license){
+    public License updateLicense(License license) {
         licenseRepository.save(license);
         return license.withComment(config.getProperty());
     }
 
-    public String deleteLicense(String licenseId){
+    public String deleteLicense(String licenseId) {
         String responseMessage = null;
 
         License license = new License();
         license.setLicenseId(licenseId);
         licenseRepository.delete(license);
         responseMessage = String.format(messageSource.getMessage(
-                "license.delete.message", null, null),licenseId);
+                "license.delete.message", null, null), licenseId);
         return responseMessage;
     }
 
@@ -111,8 +114,8 @@ public class LicenseService {
     private OrganizationResponse retrieveOrganizationInfo(String organizationId, String clientType) {
         switch (clientType) {
             /*
-            * Netflix Feign Client – A declarative REST client integrated with Eureka for automatic load-balanced calls.
-            * */
+             * Netflix Feign Client – A declarative REST client integrated with Eureka for automatic load-balanced calls.
+             * */
             case "feign":
                 try {
                     return organizationFeignClient.getOrganization(organizationId);
@@ -120,14 +123,14 @@ public class LicenseService {
                     LOG.error("Organization not found: {}", organizationId);
                     return null;  // or throw the exception further
                 }
-            /*
-            * Spring Discovery Client–enabled RestTemplate – A RestTemplate enhanced to work with service discovery automatically.
-            * */
+                /*
+                 * Spring Discovery Client–enabled RestTemplate – A RestTemplate enhanced to work with service discovery automatically.
+                 * */
             case "rest":
                 return restTemplateClient.getOrganization(organizationId);
             /*
-            * Spring Discovery Client – Uses DiscoveryClient and a standard RestTemplate.
-            * */
+             * Spring Discovery Client – Uses DiscoveryClient and a standard RestTemplate.
+             * */
             case "webclient":
                 return wbClient.getOrganization(organizationId);
             default:
@@ -141,22 +144,54 @@ public class LicenseService {
      *     <li>After enough failures, the circuit breaker becomes OPEN.</li>
      *     <li>Once OPEN, Resilience4j throws CallNotPermittedException immediately for any further calls.</li>
      * </ul>
-     * */
-    @CircuitBreaker(name = "licenseService")
+     *
+     */
+    @CircuitBreaker(name = "licenseService", fallbackMethod = "buildFallbackLicenseList")
+    // @Bulkhead(name = "bulkheadLicenseService", type = Bulkhead.Type.THREADPOOL, fallbackMethod = "buildFallbackLicenseList")
+    // @Retry(name = "retryLicenseService", fallbackMethod = "buildFallbackLicenseList")
+    // @RateLimiter(name = "licenseService", fallbackMethod = "buildFallbackLicenseList")
     public List<License> getLicensesByOrganization(String organizationId) throws InterruptedException, TimeoutException {
-        randomlyRunLong();
+
+        LOG.info("getLicensesByOrganization Correlation id: {}",
+                UserContextHolder.getContext().getCorrelationId());
+
+        /* for testing @Retry
+        int attempt = counter.incrementAndGet();
+
+        if (attempt <= 2) { // fail first 2 calls
+            throw new TimeoutException("Simulated timeout");
+        }*/
+
+        // randomlyRunLong();
         return licenseRepository.findByOrganizationId(organizationId);
     }
 
+    private List<License> buildFallbackLicenseList(
+            String organizationId, Throwable t) {
+
+        List<License> fallbackList = new ArrayList<>();
+
+        License license = new License();
+        license.setLicenseId("0000000-00-xxxxx");
+        license.setOrganizationId(organizationId);
+        license.setProductName(
+                "Sorry no licensing information currently available"
+        );
+
+        fallbackList.add(license);
+        return fallbackList;
+    }
+
     /*
-    * Purposely timing out a call to the licensing service database
-    * */
+     * Purposely timing out a call to the licensing service database
+     * */
     private void randomlyRunLong() throws InterruptedException, TimeoutException {
         /*Random rand = new Random();
         int randomNum = rand.nextInt(3) + 1;
         if (randomNum==3)*/
         sleep();
     }
+
     /*private void sleep(){
         try {
             Thread.sleep(5000);
@@ -171,10 +206,10 @@ public class LicenseService {
     }
 
     /*
-    * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    *                                                  FROM CHAPTER 3
-    * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    * */
+     * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     *                                                  FROM CHAPTER 3
+     * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     * */
 
     /*public License getLicense(String licenseId, String organizationId) {
         License license = new License();

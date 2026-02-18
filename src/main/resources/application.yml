@@ -42,3 +42,32 @@ resilience4j.circuitbreaker:
         ringBufferSizeInHalfOpenState: 4
         waitDurationInOpenState: 20s
         failureRateThreshold: 60
+
+resilience4j.bulkhead:
+  instances:
+    bulkheadLicenseService:
+      maxWaitDuration: 10ms          # maximum amount of time to block a thread
+      maxConcurrentCalls: 20         # The maximum number of concurrent requests
+
+resilience4j.thread-pool-bulkhead:
+  instances:
+    bulkheadLicenseService:
+      maxThreadPoolSize: 1           # The maximum number of threads in the thread pool
+      coreThreadPoolSize: 1          # The core thread pool size
+      queueCapacity: 1               # The queue’s capacity (Waiting requests)
+      keepAliveDuration: 20ms        # Idle thread timeout (The maximum time that idle threads wait for new tasks before terminating)
+
+resilience4j.retry:
+  instances:
+    retryLicenseService:
+      maxAttempts: 3
+      waitDuration: 10s             # or 10000ms
+      retryExceptions:
+        - java.util.concurrent.TimeoutException
+
+resilience4j.ratelimiter:
+  instances:
+    licenseService:
+      timeoutDuration: 0            # 1000ms
+      limitRefreshPeriod: 10s
+      limitForPeriod: 2
