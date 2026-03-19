@@ -2,6 +2,8 @@ package com.optimagrowth.license.utils;
 
 public class UserContextHolder {
 
+    private UserContextHolder() {}
+
     private static final ThreadLocal<UserContext> userContext =
             ThreadLocal.withInitial(UserContext::new);
 
