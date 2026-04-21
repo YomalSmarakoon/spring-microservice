@@ -1,5 +1,6 @@
 package com.optimagrowth.license;
 
+import com.optimagrowth.license.utils.UserContextInterceptor;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
@@ -54,6 +55,13 @@ public class LicensingServiceApplication {
     @LoadBalanced  // ❶ Makes this RestTemplate use Eureka + Load Balancer
     @Bean
     public RestTemplate getRestTemplate() {
-        return new RestTemplate();
+        // A custom RestTemplate bean ensures the interceptor is used automatically.
+        // @LoadBalanced allows the RestTemplate to resolve service names through Eureka.
+        RestTemplate template = new RestTemplate();
+        template.getInterceptors().add(new UserContextInterceptor());
+
+        return template;
+
+        // return new RestTemplate();
     }
 }
