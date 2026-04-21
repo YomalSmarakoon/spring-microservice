@@ -13,6 +13,39 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.UUID;
 
+/**
+ * Holds user-specific request context using {@link ThreadLocal}.
+ *
+ * <p>This implementation ensures that each thread has its own isolated
+ * {@link UserContext}, making it safe to use in a typical synchronous
+ * request-response lifecycle (e.g., Spring MVC).</p>
+ *
+ * <p><b>Important:</b> This context is bound to the current thread only.
+ * It works correctly as long as the execution remains within the same thread.</p>
+ *
+ * <p>The context will <b>NOT</b> be automatically propagated to other threads in cases such as:</p>
+ * <ul>
+ *     <li>Methods annotated with {@code @Async}</li>
+ *     <li>Usage of {@link java.util.concurrent.CompletableFuture}</li>
+ *     <li>Parallel streams</li>
+ *     <li>Reactive programming (e.g., Spring WebFlux)</li>
+ * </ul>
+ *
+ * <p>This is because {@link ThreadLocal} does not share data across threads.
+ * Each new thread will have its own separate context instance.</p>
+ *
+ * <p>Therefore, if your application uses asynchronous or multi-threaded
+ * execution, you must manually propagate the context or use alternative
+ * mechanisms such as:</p>
+ * <ul>
+ *     <li>Custom context propagation strategies</li>
+ *     <li>{@code InheritableThreadLocal} (with caution)</li>
+ *     <li>Framework-provided context propagation (e.g., Reactor Context)</li>
+ * </ul>
+ *
+ * <p><b>Note:</b> Always clear the context after request completion
+ * (e.g., in a filter) to prevent memory leaks due to thread reuse in pools.</p>
+ */
 @Component
 public class UserContextFilter extends OncePerRequestFilter {
 
@@ -58,6 +91,8 @@ public class UserContextFilter extends OncePerRequestFilter {
             String correlationId = headerOrNull(request, HDR_CORRELATION_ID);
             if (correlationId == null || correlationId.isBlank()) {
                 correlationId = UUID.randomUUID().toString();
+
+                LOG.debug("correlation-id generated in user context filter: {}.", correlationId);
             }
 
             context.setCorrelationId(correlationId);
@@ -84,4 +119,10 @@ public class UserContextFilter extends OncePerRequestFilter {
         String value = request.getHeader(name);
         return (value == null || value.isBlank()) ? null : value.trim();
     }
+
+    /*
+    * More:
+    * - how to automatically inject correlationId into logs (logback config)
+    * - OR how this breaks in async (@Async) and how to fix it (very useful in real projects)
+    * */
 }
