@@ -85,6 +85,9 @@ public class LicenseService {
     }
 
     public LicenseResponse getLicense(String licenseId, String organizationId, String clientType) {
+
+        LOG.info("getLicense; Correlation id: {}", UserContextHolder.getContext().getCorrelationId());
+
         License license = licenseRepository.findByOrganizationIdAndLicenseId(organizationId, licenseId);
         if (null == license) {
             throw new IllegalArgumentException(String.format(
@@ -97,8 +100,7 @@ public class LicenseService {
         LicenseResponse licenseResponse = new LicenseResponse(license);
 
         // retrieve org info based on clientType (Feign / RestTemplate / WebClient)
-        OrganizationResponse organization = retrieveOrganizationInfo(organizationId,
-                clientType);
+        OrganizationResponse organization = retrieveOrganizationInfo(organizationId, clientType);
 
         // populate organization fields into the license
         if (null != organization) {
