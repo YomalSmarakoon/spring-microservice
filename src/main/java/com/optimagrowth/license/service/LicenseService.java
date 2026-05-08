@@ -133,7 +133,7 @@ public class LicenseService {
             /*
              * Spring Discovery Client – Uses DiscoveryClient and a standard RestTemplate.
              * */
-            case "webclient":
+            case "discovery":
                 return wbClient.getOrganization(organizationId);
             default:
                 return null;

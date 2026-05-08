@@ -2,7 +2,7 @@
 `mvn spring-boot:run` - start a Spring Boot application using Maven.
 
 # Build project
-mvn clean package -DskipTests
+`mvn clean package -DskipTests`
 
 # Build docker
 * `docker build . --tag licensing-service`  || `mvn package dockerfile:build`
