@@ -11,6 +11,18 @@ spring:
 #        jwt:
 #          issuer-uri: http://localhost:8080/realms/spmia-realm # Use localhost if your Spring app runs outside Docker
           # Use keycloak if your Spring app runs inside Docker Compose with a service named keycloak: http://keycloak:8080/realms/spmia-realm
+  cloud:
+    function:
+      definition: organizationChangeConsumer
+    stream:
+      bindings:
+        organizationChangeConsumer-in-0:
+          destination: orgChangeTopic
+          group: licensing-service
+          content-type: application/json
+      kafka:
+        binder:
+          brokers: localhost:9092
 
 resilience4j.circuitbreaker:
     instances:
