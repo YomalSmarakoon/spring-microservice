@@ -1,7 +1,7 @@
 package com.optimagrowth.license.service;
 
+import com.optimagrowth.license.clients.OrganizationCacheClient;
 import com.optimagrowth.license.clients.OrganizationDiscoveryClient;
-import com.optimagrowth.license.clients.OrganizationFeignClient;
 import com.optimagrowth.license.clients.OrganizationRestTemplateClient;
 import com.optimagrowth.license.config.ServiceConfig;
 import com.optimagrowth.license.exception.OrganizationNotFoundException;
@@ -43,8 +43,11 @@ public class LicenseService {
     @Autowired
     private OrganizationRestTemplateClient restTemplateClient;
 
+    // OrganizationCacheClient wraps the Feign client and adds Redis caching.
+    // LicenseService calls this instead of OrganizationFeignClient directly so
+    // all organization lookups go through the cache-or-fetch path transparently.
     @Autowired
-    private OrganizationFeignClient organizationFeignClient;
+    private OrganizationCacheClient organizationCacheClient;
 
     private final AtomicInteger counter = new AtomicInteger(0); // for testing retry
 
@@ -113,26 +116,32 @@ public class LicenseService {
     }
 
 
+    /**
+     * Resolves organization data using the requested client strategy.
+     * <p>
+     * The "feign" path goes through OrganizationCacheClient, which checks Redis
+     * before making an HTTP call. A cache hit returns immediately without touching
+     * the network. A cache miss calls the organization service and stores the
+     * result in Redis for the next request.
+     * </p>
+     * The "rest" and "discovery" paths bypass the cache — they are kept for
+     * educational comparison purposes and are not recommended for production use.
+     */
     private OrganizationResponse retrieveOrganizationInfo(String organizationId, String clientType) {
         switch (clientType) {
-            /*
-             * Netflix Feign Client – A declarative REST client integrated with Eureka for automatic load-balanced calls.
-             * */
+            // Feign client path — goes through Redis cache first.
+            // Uses Eureka for service discovery and load balancing.
             case "feign":
                 try {
-                    return organizationFeignClient.getOrganization(organizationId);
+                    return organizationCacheClient.getOrganization(organizationId);
                 } catch (OrganizationNotFoundException ex) {
                     LOG.error("Organization not found: {}", organizationId);
-                    return null;  // or throw the exception further
+                    return null;
                 }
-                /*
-                 * Spring Discovery Client–enabled RestTemplate – A RestTemplate enhanced to work with service discovery automatically.
-                 * */
+            // Load-balanced RestTemplate path — bypasses cache.
             case "rest":
                 return restTemplateClient.getOrganization(organizationId);
-            /*
-             * Spring Discovery Client – Uses DiscoveryClient and a standard RestTemplate.
-             * */
+            // Raw DiscoveryClient path — bypasses cache, no load balancing.
             case "discovery":
                 return wbClient.getOrganization(organizationId);
             default:

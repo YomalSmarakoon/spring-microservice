@@ -15,5 +15,8 @@ public class OrganizationResponse {
     private String contactEmail;
     private String contactPhone;
 
-    OrganizationResponse() {}
+    // Must be public so Jackson can instantiate this class when deserializing
+    // the JSON stored in Redis. A package-private or private constructor causes
+    // a JsonMappingException at runtime when reading from the cache.
+    public OrganizationResponse() {}
 }

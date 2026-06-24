@@ -1,0 +1,837 @@
+<title>Book vs. Modern · Spring Redis Caching</title>
+<style>
+:root {
+  --ground:       #0F1923;
+  --surface:      #17232F;
+  --surface-2:    #1E2F3E;
+  --border:       #253344;
+  --text:         #DCE3ED;
+  --muted:        #5E7590;
+  --book:         #C4873A;
+  --book-dim:     rgba(196,135,58,0.12);
+  --book-mid:     #C4A06A;
+  --modern:       #2FBFA8;
+  --modern-dim:   rgba(47,191,168,0.10);
+  --modern-mid:   #5CCFBB;
+  --mono: ui-monospace,'Cascadia Code','SF Mono','Fira Code',monospace;
+  --sans: system-ui,-apple-system,BlinkMacSystemFont,sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--ground);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── HERO ─────────────────────────────────────────────────────── */
+.hero {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 5rem 2rem 4rem;
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.hero-eyebrow {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 2.25rem;
+}
+
+.hero-title {
+  font-family: var(--mono);
+  font-size: clamp(1.9rem, 5.5vw, 3.6rem);
+  font-weight: 400;
+  line-height: 1.2;
+  color: var(--text);
+  margin-bottom: 1.5rem;
+}
+
+.hero-title .t-book    { color: var(--book); }
+.hero-title .t-modern  { color: var(--modern); }
+.hero-title .t-vs      { color: var(--muted); font-size: 0.65em; }
+
+.hero-sub {
+  font-size: 1rem;
+  color: var(--muted);
+  max-width: 520px;
+  margin-bottom: 3.25rem;
+  line-height: 1.75;
+}
+
+/* ── ANIMATED DIFF BLOCK ──────────────────────────────────────── */
+.diff-block {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  font-family: var(--mono);
+  font-size: 0.79rem;
+  line-height: 1.85;
+  max-width: 760px;
+}
+
+.diff-bar {
+  background: var(--surface-2);
+  padding: 0.55rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.diff-bar .dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.diff-bar .filename {
+  margin-left: 0.5rem;
+  font-size: 0.7rem;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+
+.diff-line {
+  display: flex;
+  align-items: baseline;
+  padding: 0 1.1rem;
+  transition: opacity 0.3s;
+}
+
+.diff-line .gutter {
+  width: 2.2rem;
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 0.68rem;
+  user-select: none;
+}
+
+.diff-line .marker {
+  width: 1.1rem;
+  flex-shrink: 0;
+}
+
+.diff-line.removed {
+  background: rgba(196,135,58,0.10);
+  color: var(--book-mid);
+}
+
+.diff-line.removed .marker { color: var(--book); }
+
+.diff-line.added {
+  background: rgba(47,191,168,0.09);
+  color: var(--modern-mid);
+}
+
+.diff-line.added .marker { color: var(--modern); }
+
+.diff-line.ctx { color: var(--muted); }
+
+.hidden { display: none; }
+
+@keyframes strikeOut {
+  0%   { opacity: 1; }
+  50%  { opacity: 0.4; text-decoration: line-through; }
+  100% { opacity: 0; max-height: 0; padding-top: 0; padding-bottom: 0; overflow: hidden; }
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-6px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.removed.striking { animation: strikeOut 0.55s ease-out forwards; }
+.added.appearing  { opacity: 0; animation: slideIn 0.45s ease-out forwards; }
+
+@media (prefers-reduced-motion: reduce) {
+  .removed.striking { animation: none; opacity: 0.3; }
+  .added.appearing  { animation: none; opacity: 1; }
+}
+
+/* ── CONTENT WRAPPER ──────────────────────────────────────────── */
+.content {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 2rem 7rem;
+}
+
+/* ── DIMENSION SECTION ────────────────────────────────────────── */
+.dimension {
+  padding: 4.5rem 0;
+  border-top: 1px solid var(--border);
+}
+
+.dim-label {
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 0.6rem;
+}
+
+.dim-title {
+  font-family: var(--mono);
+  font-size: clamp(1.3rem, 2.8vw, 2rem);
+  font-weight: 400;
+  color: var(--text);
+  margin-bottom: 0.7rem;
+  line-height: 1.25;
+}
+
+.dim-summary {
+  color: var(--muted);
+  font-size: 0.92rem;
+  max-width: 660px;
+  margin-bottom: 2.5rem;
+  line-height: 1.8;
+}
+
+/* ── COMPARE GRID ─────────────────────────────────────────────── */
+.cmp {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+}
+
+@media (max-width: 700px) { .cmp { grid-template-columns: 1fr; } }
+
+.cmp-col { display: flex; flex-direction: column; gap: 0.9rem; }
+
+.cmp-header {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-family: var(--mono);
+  font-size: 0.67rem;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  padding-bottom: 0.65rem;
+  border-bottom: 2px solid currentColor;
+}
+
+.cmp-header.bk  { color: var(--book); }
+.cmp-header.md  { color: var(--modern); }
+.cmp-header .pip {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+/* ── CODE SNIPPET ─────────────────────────────────────────────── */
+.snippet {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1rem 1.15rem;
+  font-family: var(--mono);
+  font-size: 0.76rem;
+  line-height: 1.85;
+  overflow-x: auto;
+  flex: 1;
+  tab-size: 2;
+}
+
+.snippet b { font-weight: 600; }
+
+/* syntax token colours */
+.kw   { color: #7FAADB; }
+.ann  { color: var(--book); }
+.anm  { color: var(--modern); }
+.str  { color: #98C879; }
+.typ  { color: #B4A0D4; }
+.cm   { color: #3E566E; font-style: italic; }
+
+/* ── VERDICT CARD ─────────────────────────────────────────────── */
+.verdict {
+  padding: 0.8rem 1rem;
+  border-radius: 4px;
+  font-size: 0.83rem;
+  line-height: 1.65;
+}
+
+.verdict.bk {
+  background: var(--book-dim);
+  border-left: 3px solid var(--book);
+  color: var(--book-mid);
+}
+
+.verdict.md {
+  background: var(--modern-dim);
+  border-left: 3px solid var(--modern);
+  color: var(--modern-mid);
+}
+
+/* ── BONUS CALLOUT (constructor fix) ──────────────────────────── */
+.callout {
+  margin-top: 4rem;
+  padding: 1.5rem 1.75rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--modern);
+  border-radius: 4px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 1rem;
+}
+
+.callout-icon {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--modern);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  padding-top: 0.15rem;
+}
+
+.callout-title {
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  color: var(--text);
+  margin-bottom: 0.4rem;
+}
+
+.callout-body {
+  font-size: 0.85rem;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.callout-body code {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  color: var(--modern-mid);
+  background: var(--surface-2);
+  padding: 0.05rem 0.3rem;
+  border-radius: 3px;
+}
+
+/* ── SUMMARY TABLE ────────────────────────────────────────────── */
+.summary {
+  padding-top: 4.5rem;
+  border-top: 1px solid var(--border);
+  margin-top: 1rem;
+}
+
+.summary-label {
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 2rem;
+}
+
+.tbl-wrap { overflow-x: auto; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.84rem;
+}
+
+thead th {
+  font-family: var(--mono);
+  font-size: 0.63rem;
+  letter-spacing: 0.17em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 0.65rem 1rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+tbody td {
+  padding: 0.8rem 1rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+  line-height: 1.5;
+}
+
+tbody td:first-child {
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.bk-cell  { color: var(--book-mid); }
+.md-cell  { color: var(--modern-mid); }
+
+.tag {
+  display: inline-block;
+  padding: 0.1rem 0.45rem;
+  border-radius: 3px;
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.04em;
+  vertical-align: middle;
+}
+
+.tag-dep  { background: rgba(196,135,58,0.2); color: var(--book); }
+.tag-ok   { background: rgba(47,191,168,0.15); color: var(--modern); }
+</style>
+
+<!-- HERO -------------------------------------------------------->
+<header class="hero">
+  <p class="hero-eyebrow">Spring Microservices in Action &nbsp;·&nbsp; Chapter 10 &nbsp;·&nbsp; Architecture analysis</p>
+
+  <h1 class="hero-title">
+    <span class="t-book">RedisTemplate</span><br>
+    <span class="t-vs">  vs  </span><br>
+    <span class="t-modern">Spring Cache Abstraction</span>
+  </h1>
+
+  <p class="hero-sub">
+    Six decisions where the book's 2019 implementation and the modern Spring Boot 3 approach diverge — what each choice costs, what it protects against, and why the difference matters at runtime.
+  </p>
+
+  <div class="diff-block" role="figure" aria-label="Animated code diff showing the transition from manual Redis access to @Cacheable">
+    <div class="diff-bar">
+      <span class="dot" style="background:#ff5f57" aria-hidden="true"></span>
+      <span class="dot" style="background:#febc2e" aria-hidden="true"></span>
+      <span class="dot" style="background:#28c840" aria-hidden="true"></span>
+      <span class="filename">LicenseService.java &nbsp;·&nbsp; retrieveOrganizationInfo()</span>
+    </div>
+    <div class="diff-line removed" id="r1"><span class="gutter"></span><span class="marker">-</span><span><span class="kw">var</span> org = redisRepo.findOrganization(organizationId);</span></div>
+    <div class="diff-line removed" id="r2"><span class="gutter"></span><span class="marker">-</span><span><span class="kw">if</span> (org == <span class="kw">null</span>) { org = feignClient.getOrganization(organizationId); }</span></div>
+    <div class="diff-line removed" id="r3"><span class="gutter"></span><span class="marker">-</span><span><span class="kw">if</span> (org != <span class="kw">null</span>) { redisRepo.saveOrganization(org); }</span></div>
+    <div class="diff-line added hidden" id="a1"><span class="gutter"></span><span class="marker">+</span><span><span class="ann">@Cacheable</span>(cacheNames = <span class="str">"organizations"</span>, key = <span class="str">"#organizationId"</span>,</span></div>
+    <div class="diff-line added hidden" id="a2"><span class="gutter"></span><span class="marker">+</span><span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; unless = <span class="str">"#result == null"</span>)</span></div>
+    <div class="diff-line added hidden" id="a3"><span class="gutter"></span><span class="marker">+</span><span><span class="kw">var</span> org = <b>orgCacheClient</b>.getOrganization(organizationId);</span></div>
+    <div class="diff-line ctx"><span class="gutter"></span><span class="marker">&nbsp;</span><span><span class="kw">return</span> buildLicense(license, org);</span></div>
+  </div>
+</header>
+
+<!-- MAIN --------------------------------------------------------->
+<main class="content">
+
+  <!-- 01 — Cache Access Pattern --------------------------------->
+  <section class="dimension">
+    <p class="dim-label">Dimension 01</p>
+    <h2 class="dim-title">Cache Access Pattern</h2>
+    <p class="dim-summary">
+      How the service reads from and writes to Redis. The book implements cache-or-fetch imperatively at every call site. The modern approach declares intent once via an annotation and lets the framework manage the mechanics.
+    </p>
+    <div class="cmp">
+      <div class="cmp-col">
+        <div class="cmp-header bk"><span class="pip"></span>Book &mdash; Manual RedisTemplate</div>
+        <div class="snippet"><span class="cm">// OrganizationRedisRepository</span>
+<span class="typ">HashOperations</span>&lt;<span class="typ">String</span>,<span class="typ">String</span>,<span class="typ">Organization</span>&gt; hash;
+
+<span class="kw">public</span> <span class="typ">Organization</span> findOrganization(<span class="typ">String</span> id) {
+  <span class="kw">return</span> hash.get(HASH_NAME, id);
+}
+
+<span class="kw">public void</span> saveOrganization(<span class="typ">Organization</span> org) {
+  hash.put(HASH_NAME, org.getId(), org);
+}
+
+<span class="cm">// LicenseService — cache logic here too</span>
+org = redisRepo.findOrganization(id);
+<span class="kw">if</span> (org == <span class="kw">null</span>) {
+  org = feignClient.getOrganization(id);
+  <span class="kw">if</span> (org != <span class="kw">null</span>) redisRepo.saveOrganization(org);
+}</div>
+        <div class="verdict bk">Cache logic is duplicated across the repository and service layers. A second client path (REST, Discovery) must repeat the read-through pattern manually — and will drift.</div>
+      </div>
+      <div class="cmp-col">
+        <div class="cmp-header md"><span class="pip"></span>Modern &mdash; @Cacheable declarative</div>
+        <div class="snippet"><span class="cm">// OrganizationCacheClient — one declaration</span>
+<span class="anm">@Cacheable</span>(
+  cacheNames = <span class="str">"organizations"</span>,
+  key = <span class="str">"#organizationId"</span>,
+  unless = <span class="str">"#result == null"</span>
+)
+<span class="kw">public</span> <span class="typ">OrganizationResponse</span> getOrganization(
+    <span class="typ">String</span> organizationId) {
+  LOG.info(<span class="str">"Cache miss — calling service"</span>);
+  <span class="kw">return</span> feignClient.getOrganization(organizationId);
+}
+
+<span class="cm">// LicenseService — no Redis knowledge needed</span>
+org = orgCacheClient.getOrganization(id);</div>
+        <div class="verdict md">Cache-or-fetch logic exists in exactly one place. <code style="font-family:inherit;font-size:0.82em;background:rgba(47,191,168,0.1);padding:0 0.25rem;border-radius:2px">LicenseService</code> has no awareness of Redis — it calls <code style="font-family:inherit;font-size:0.82em;background:rgba(47,191,168,0.1);padding:0 0.25rem;border-radius:2px">getOrganization</code> and gets a result, cached or not.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 02 — The Double-Proxy Problem ---------------------------->
+  <section class="dimension">
+    <p class="dim-label">Dimension 02</p>
+    <h2 class="dim-title">The Double-Proxy Problem</h2>
+    <p class="dim-summary">
+      Feign wraps <code style="font-family:var(--mono);font-size:0.85em;color:var(--book-mid)">OrganizationFeignClient</code> in a JDK dynamic proxy. Spring AOP caching wraps beans in a second proxy. Stacking both on the same object — putting <code style="font-family:var(--mono);font-size:0.85em;color:var(--book-mid)">@Cacheable</code> on the Feign interface — breaks silently depending on CGLIB mode and AOT settings. The book avoids the conflict by not using Spring AOP caching at all; the modern code solves it properly.
+    </p>
+    <div class="cmp">
+      <div class="cmp-col">
+        <div class="cmp-header bk"><span class="pip"></span>Book &mdash; Conflict avoided (by accident)</div>
+        <div class="snippet"><span class="cm">// Book never applies @Cacheable</span>
+<span class="cm">// to a Feign interface — it uses</span>
+<span class="cm">// a concrete repo with RedisTemplate.</span>
+<span class="cm">// The proxy conflict never arises</span>
+<span class="cm">// because Spring AOP is not involved.</span>
+
+<span class="ann">@Repository</span>
+<span class="kw">public class</span> <span class="typ">OrganizationRedisRepository</span> {
+  <span class="cm">// manual HashOperations — no AOP proxy</span>
+}</div>
+        <div class="verdict bk">The conflict is avoided by not using the cache abstraction at all. The cost is every Redis operation being handwritten, with no TTL, no error handling, and no framework-managed serialization.</div>
+      </div>
+      <div class="cmp-col">
+        <div class="cmp-header md"><span class="pip"></span>Modern &mdash; Separation by design</div>
+        <div class="snippet"><span class="cm">// Feign interface — pure HTTP transport.</span>
+<span class="cm">// No @Cacheable here. One proxy layer.</span>
+<span class="anm">@FeignClient</span>(name = <span class="str">"organization-service"</span>)
+<span class="kw">public interface</span> <span class="typ">OrganizationFeignClient</span> { ... }
+
+<span class="cm">// Concrete @Service — safe for AOP proxy.</span>
+<span class="cm">// Spring wraps this class cleanly.</span>
+<span class="anm">@Service</span>
+<span class="kw">public class</span> <span class="typ">OrganizationCacheClient</span> {
+  <span class="cm">// @Cacheable lives here.</span>
+  <span class="cm">// Transport and caching never share</span>
+  <span class="cm">// a proxy chain.</span>
+}</div>
+        <div class="verdict md">Each layer does exactly one job. The Feign proxy handles HTTP transport; the Spring AOP proxy handles cache interception. They never meet on the same object.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 03 — Configuration --------------------------------------->
+  <section class="dimension">
+    <p class="dim-label">Dimension 03</p>
+    <h2 class="dim-title">Cache Configuration</h2>
+    <p class="dim-summary">
+      TTL, serialization format, and null-value handling. The book relies on defaults and manual property files. The modern <code style="font-family:var(--mono);font-size:0.85em;color:var(--modern-mid)">CacheConfig</code> makes all three explicit in code.
+    </p>
+    <div class="cmp">
+      <div class="cmp-col">
+        <div class="cmp-header bk"><span class="pip"></span>Book &mdash; Implicit defaults</div>
+        <div class="snippet"><span class="cm"># application.properties</span>
+redis.server=localhost
+redis.port=6379
+
+<span class="cm">// No RedisCacheManager configured.</span>
+
+<span class="cm">// Serializer: JdkSerializationRedisSerializer</span>
+<span class="cm">//   → binary blobs in redis-cli, unreadable.</span>
+
+<span class="cm">// TTL: none — entries live until deleted.</span>
+<span class="cm">//   A missed eviction = stale data forever.</span>
+
+<span class="cm">// Null guard: none.</span>
+<span class="cm">//   org-not-found → null cached → served</span>
+<span class="cm">//   to all callers until service restarts.</span></div>
+        <div class="verdict bk">Works out of the box, but entries never expire, cache contents are opaque in redis-cli, and a null response from the org service poisons all future lookups with no TTL backstop.</div>
+      </div>
+      <div class="cmp-col">
+        <div class="cmp-header md"><span class="pip"></span>Modern &mdash; CacheConfig</div>
+        <div class="snippet"><span class="anm">@Bean</span>
+<span class="typ">RedisCacheConfiguration</span> defaultCacheConfiguration() {
+  <span class="kw">return</span> <span class="typ">RedisCacheConfiguration</span>.defaultCacheConfig()
+    .entryTtl(<span class="typ">Duration</span>.ofMinutes(<span class="str">30</span>))
+    .serializeValuesWith(
+      <span class="cm">/* GenericJackson2JsonRedisSerializer */</span>
+    )
+    .disableCachingNullValues();
+}
+
+<span class="cm">// TTL: 30-min backstop for missed events.</span>
+<span class="cm">// Serializer: JSON — readable in redis-cli.</span>
+<span class="cm">// Nulls blocked at config layer AND</span>
+<span class="cm">//   at annotation (unless="#result==null").</span></div>
+        <div class="verdict md">TTL is a backstop when Kafka events don't arrive. JSON makes entries inspectable during debugging. Null values are blocked at two independent layers — neither can be bypassed by accident.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 04 — Redis Failure Behavior ----------------------------->
+  <section class="dimension">
+    <p class="dim-label">Dimension 04</p>
+    <h2 class="dim-title">Redis Failure Behavior</h2>
+    <p class="dim-summary">
+      A cache is a performance optimization. Its absence should degrade performance, not stop the service. The book does not configure a Redis error handler, which means a Redis outage propagates as a 500 to every license lookup — even though PostgreSQL and the org service are both healthy.
+    </p>
+    <div class="cmp">
+      <div class="cmp-col">
+        <div class="cmp-header bk"><span class="pip"></span>Book &mdash; Uncaught exception</div>
+        <div class="snippet"><span class="cm">// No error handler configured.</span>
+<span class="cm">// RedisConnectionFailureException</span>
+<span class="cm">// propagates up the call stack.</span>
+
+GET /licenses/123
+  → LicenseService.getLicense()
+    → redisRepo.findOrganization()
+      → <span class="ann">RedisConnectionFailureException</span>
+        → <span class="ann">HTTP 500</span> ✗
+
+<span class="cm">// Postgres healthy. Org service healthy.</span>
+<span class="cm">// Service appears down because a cache</span>
+<span class="cm">// became a hard dependency.</span></div>
+        <div class="verdict bk">A Redis outage takes down the entire license lookup. The cache — a performance layer — is now a reliability dependency. Every request fails until Redis recovers.</div>
+      </div>
+      <div class="cmp-col">
+        <div class="cmp-header md"><span class="pip"></span>Modern &mdash; CacheErrorHandler via CachingConfigurer</div>
+        <div class="snippet"><span class="kw">public class</span> <span class="typ">CacheConfig</span>
+    <span class="kw">implements</span> <span class="typ">CachingConfigurer</span> {
+
+  <span class="anm">@Override</span>
+  <span class="kw">public</span> <span class="typ">CacheErrorHandler</span> errorHandler() {
+    <span class="kw">return new</span> <span class="typ">CacheErrorHandler</span>() {
+      handleCacheGetError()   { LOG.warn(...); }
+      handleCachePutError()   { LOG.warn(...); }
+      handleCacheEvictError() { LOG.warn(...); }
+    };
+  }
+}
+
+<span class="cm">// Redis down → logged warning → fall through</span>
+<span class="cm">// to org-service HTTP call. Request succeeds</span>
+<span class="cm">// at cost of one extra network hop.</span></div>
+        <div class="verdict md">Redis failure becomes a monitored warning, not a thrown exception. The request continues — slower, but successful. The cache degrades gracefully back to direct service calls.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 05 — Cache Invalidation --------------------------------->
+  <section class="dimension">
+    <p class="dim-label">Dimension 05</p>
+    <h2 class="dim-title">Cache Invalidation</h2>
+    <p class="dim-summary">
+      How a Kafka event evicts a stale organization entry. The book calls <code style="font-family:var(--mono);font-size:0.85em;color:var(--book-mid)">hashOperations.delete()</code> directly from the handler. The modern code delegates to a separate bean — avoiding the self-invocation trap where calling an <code style="font-family:var(--mono);font-size:0.85em;color:var(--modern-mid)">@CacheEvict</code> method from within the same class bypasses the AOP proxy and silently does nothing.
+    </p>
+    <div class="cmp">
+      <div class="cmp-col">
+        <div class="cmp-header bk"><span class="pip"></span>Book &mdash; Direct hash delete</div>
+        <div class="snippet"><span class="ann">@StreamListener</span>(<span class="typ">Sink</span>.INPUT)
+<span class="kw">public void</span> logOrganizationChange(
+    <span class="typ">OrganizationChangeModel</span> change) {
+
+  <span class="kw">if</span> (<span class="str">"UPDATE"</span>.equals(change.getAction())
+   || <span class="str">"DELETE"</span>.equals(change.getAction())) {
+
+    orgRedisRepo.deleteOrganization(
+        change.getOrganizationId());
+  }
+}
+
+<span class="cm">// CREATE events skip eviction —</span>
+<span class="cm">// correct, but implicit.</span>
+<span class="cm">// New action types need manual guard updates.</span></div>
+        <div class="verdict bk">The action-type guard is a subtle maintenance risk: any new action type added in future must be explicitly handled here, or eviction silently skips it. The intent is obscured inside a conditional.</div>
+      </div>
+      <div class="cmp-col">
+        <div class="cmp-header md"><span class="pip"></span>Modern &mdash; @CacheEvict on dedicated bean</div>
+        <div class="snippet"><span class="cm">// OrganizationCacheInvalidator — own bean.</span>
+<span class="cm">// AOP proxy fires on every external call.</span>
+<span class="cm">// Self-invocation trap cannot occur.</span>
+<span class="anm">@CacheEvict</span>(
+  cacheNames = <span class="str">"organizations"</span>,
+  key = <span class="str">"#event.organizationId"</span>
+)
+<span class="kw">public void</span> invalidate(
+    <span class="typ">OrganizationChangeModel</span> event) {
+  LOG.info(<span class="str">"Evicted. action={}, id={}"</span>, ...);
+}
+
+<span class="cm">// No action-type guard needed.</span>
+<span class="cm">// Evicting a missing Redis key = safe no-op.</span>
+<span class="cm">// CREATE, UPDATE, DELETE handled identically.</span></div>
+        <div class="verdict md">All event types call <code style="font-family:inherit;font-size:0.82em;background:rgba(47,191,168,0.1);padding:0 0.25rem;border-radius:2px">invalidate()</code> without branching. Evicting a non-existent Redis key costs a round-trip and nothing else. No conditional to maintain as the event schema evolves.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 06 — Messaging API -------------------------------------->
+  <section class="dimension">
+    <p class="dim-label">Dimension 06</p>
+    <h2 class="dim-title">Messaging Consumer API</h2>
+    <p class="dim-summary">
+      How the Kafka listener is declared. <code style="font-family:var(--mono);font-size:0.85em;color:var(--book-mid)">@StreamListener</code> and <code style="font-family:var(--mono);font-size:0.85em;color:var(--book-mid)">@EnableBinding</code> were deprecated in Spring Cloud Stream 3.1 and removed in 4.x. Any project upgrading its BOM past the book's version finds the consumer does not compile.
+    </p>
+    <div class="cmp">
+      <div class="cmp-col">
+        <div class="cmp-header bk"><span class="pip"></span>Book &mdash; @StreamListener <span class="tag tag-dep">deprecated</span></div>
+        <div class="snippet"><span class="ann">@EnableBinding</span>(<span class="typ">Sink</span>.<span class="kw">class</span>)
+<span class="ann">@SpringBootApplication</span>
+<span class="kw">public class</span> <span class="typ">LicensingServiceApplication</span> { ... }
+
+<span class="cm">// Handler class</span>
+<span class="ann">@StreamListener</span>(<span class="typ">Sink</span>.INPUT)
+<span class="kw">public void</span> logOrganizationChange(
+    <span class="typ">OrganizationChangeModel</span> change) {
+  <span class="cm">// handle event</span>
+}
+
+<span class="cm">// @EnableBinding, @Input, @Output,</span>
+<span class="cm">// Sink, Source — all removed in 4.x.</span></div>
+        <div class="verdict bk">Compiles against the book's pinned versions. Breaks the moment the Spring Cloud BOM is updated past the deprecation window — a common first step when upgrading to Spring Boot 3.</div>
+      </div>
+      <div class="cmp-col">
+        <div class="cmp-header md"><span class="pip"></span>Modern &mdash; Consumer&lt;T&gt; functional <span class="tag tag-ok">current</span></div>
+        <div class="snippet"><span class="cm">// Bean name → binding name convention:</span>
+<span class="cm">// "organizationChangeConsumer"</span>
+<span class="cm">// → "organizationChangeConsumer-in-0"</span>
+<span class="cm">// Configured in application.yml.</span>
+
+<span class="anm">@Bean</span>
+<span class="kw">public</span> <span class="typ">Consumer</span>&lt;<span class="typ">OrganizationChangeModel</span>&gt;
+    organizationChangeConsumer() {
+  <span class="kw">return</span> event -> {
+    cacheInvalidator.invalidate(event);
+  };
+}
+
+<span class="cm">// No framework annotations on the handler.</span>
+<span class="cm">// Testable without loading any Kafka infra.</span></div>
+        <div class="verdict md">A plain Java functional interface registered as a Spring bean. No framework-specific annotations on the consumer itself — it can be tested in isolation with a mock event, no broker required.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- BONUS CALLOUT — OrganizationResponse constructor -------->
+  <div class="callout">
+    <div class="callout-icon">Side&nbsp;note</div>
+    <div>
+      <p class="callout-title">OrganizationResponse — constructor visibility</p>
+      <p class="callout-body">
+        Your diff quietly makes the no-arg constructor <code>public</code> (was package-private).
+        This is not optional: <code>GenericJackson2JsonRedisSerializer</code> calls Jackson to deserialize the
+        JSON stored in Redis back into an object. Jackson requires either a <code>public</code> no-arg constructor
+        or a <code>@JsonCreator</code>-annotated one. A package-private constructor produces a
+        <code>JsonMappingException</code> at runtime — the cache write succeeds, but the next read crashes.
+        The book's binary JDK serializer bypassed this entirely; switching to JSON surfaces it.
+      </p>
+    </div>
+  </div>
+
+  <!-- SUMMARY TABLE ------------------------------------------->
+  <div class="summary">
+    <p class="summary-label">// summary — all six dimensions</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Dimension</th>
+            <th>Book (Spring Boot 2.x)</th>
+            <th>Modern (Spring Boot 3.x)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Cache access</td>
+            <td class="bk-cell">Manual HashOperations get / put at every call site</td>
+            <td class="md-cell">@Cacheable — framework owns the read-through path</td>
+          </tr>
+          <tr>
+            <td>Proxy safety</td>
+            <td class="bk-cell">Avoided by not using Spring AOP at all</td>
+            <td class="md-cell">OrganizationCacheClient separates transport from caching</td>
+          </tr>
+          <tr>
+            <td>TTL</td>
+            <td class="bk-cell">None — entries persist until explicitly deleted</td>
+            <td class="md-cell">30 min via RedisCacheConfiguration — backstop for missed events</td>
+          </tr>
+          <tr>
+            <td>Serialization</td>
+            <td class="bk-cell">JDK binary &nbsp;<span class="tag tag-dep">opaque in redis-cli</span></td>
+            <td class="md-cell">GenericJackson2Json &nbsp;<span class="tag tag-ok">human-readable</span></td>
+          </tr>
+          <tr>
+            <td>Null caching</td>
+            <td class="bk-cell">Unguarded — null response from org service gets cached</td>
+            <td class="md-cell">Blocked at config (.disableCachingNullValues) and annotation (unless)</td>
+          </tr>
+          <tr>
+            <td>Redis failure</td>
+            <td class="bk-cell">Uncaught exception → HTTP 500 for all callers</td>
+            <td class="md-cell">CacheErrorHandler logs and falls through to org service</td>
+          </tr>
+          <tr>
+            <td>Invalidation</td>
+            <td class="bk-cell">hashOperations.delete() with action-type guard in handler</td>
+            <td class="md-cell">@CacheEvict on dedicated bean — no-op on missing key, no branching</td>
+          </tr>
+          <tr>
+            <td>Messaging API</td>
+            <td class="bk-cell">@StreamListener / @EnableBinding &nbsp;<span class="tag tag-dep">removed in 4.x</span></td>
+            <td class="md-cell">Consumer&lt;T&gt; functional bean &nbsp;<span class="tag tag-ok">current</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</main>
+
+<script>
+(function () {
+  var noMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function showAdded() {
+    ['a1','a2','a3'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.classList.remove('hidden');
+    });
+  }
+
+  if (noMotion) { showAdded(); return; }
+
+  function runDiff() {
+    var removed = ['r1','r2','r3'];
+    var added   = ['a1','a2','a3'];
+    var baseDelay = 400;
+    var step      = 160;
+
+    removed.forEach(function (id, i) {
+      setTimeout(function () {
+        var el = document.getElementById(id);
+        if (el) el.classList.add('striking');
+      }, baseDelay + i * step);
+    });
+
+    var addedStart = baseDelay + removed.length * step + 650;
+    added.forEach(function (id, i) {
+      setTimeout(function () {
+        var el = document.getElementById(id);
+        if (el) {
+          el.classList.remove('hidden');
+          // force reflow so animation fires
+          void el.offsetWidth;
+          el.classList.add('appearing');
+        }
+      }, addedStart + i * 180);
+    });
+  }
+
+  var hero = document.querySelector('.hero');
+  if (!hero) { showAdded(); return; }
+
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (e.isIntersecting) { runDiff(); obs.disconnect(); }
+    });
+  }, { threshold: 0.4 });
+
+  obs.observe(hero);
+})();
+</script>

@@ -23,6 +23,15 @@ spring:
       kafka:
         binder:
           brokers: localhost:9092
+  cache:
+    type: redis
+    redis:
+      time-to-live: 10m
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
 
 resilience4j.circuitbreaker:
     instances:
