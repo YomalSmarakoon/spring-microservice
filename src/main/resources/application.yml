@@ -98,3 +98,16 @@ resilience4j.ratelimiter:
       timeoutDuration: 0            # 1000ms
       limitRefreshPeriod: 10s
       limitForPeriod: 2
+
+info:
+  app:
+    version: 1.0.0
+
+logging:
+  logstash:
+    destination: ${LOGSTASH_DESTINATION:localhost:5000}
+
+  level:
+    root: INFO
+    org.springframework: INFO
+    com.optimagrowth: DEBUG
