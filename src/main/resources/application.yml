@@ -111,3 +111,26 @@ logging:
     root: INFO
     org.springframework: INFO
     com.optimagrowth: DEBUG
+
+#  Your docker-compose.yml publishes ports to the host ("9411:9411" for Zipkin, and the ELK/Logstash TCP appender port similarly),
+#  while the licensing-service app itself runs outside Docker (via your IDE or mvn spring-boot:run).
+#  From the host's perspective, localhost:9411 and localhost:5000 correctly reach the containers through those published port mappings —
+#  that's exactly the same reasoning already baked into your existing
+#  logging.logstash.destination: ${LOGSTASH_DESTINATION:localhost:5000} line, which also defaults to localhost.
+#
+#  So the config I added:
+#  endpoint: http://${ZIPKIN_HOST:localhost}:9411/api/v2/spans
+#  is consistent and correct for your current setup — no change needed.
+#
+#  The only time you'd need ZIPKIN_HOST=zipkin (the container/service name instead of localhost) is if you later containerize the
+#  licensing-service itself and run it inside the same Docker network as Zipkin — at that point
+#  localhost from inside that container would refer to itself, not the Zipkin container. Until then, leave it as-is.
+#  Its better to add to configs
+#  Using message broker instead of HTTP can provide better reliability because trace messages can be queued if the Zipkin server is temporarily down.
+management:
+  tracing:
+    sampling:
+      probability: 1.0
+  zipkin:
+    tracing:
+      endpoint: http://${ZIPKIN_HOST:localhost}:9411/api/v2/spans
