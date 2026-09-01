@@ -2,7 +2,10 @@ spring:
   application:
     name: licensing-service
   profiles:
-    active: dev
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+  #    Why this form instead of just deleting the line: it keeps dev as the default so nothing breaks when you run locally from your IDE with no env var set,
+  #  but lets deployment set SPRING_PROFILES_ACTIVE=prod to pick up
+  #  licensing-service-prod.properties from the config repo — no rebuild needed per environment.
   config:
     import: optional:configserver:http://localhost:8071
 #  security:
