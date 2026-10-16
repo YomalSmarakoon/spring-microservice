@@ -1,6 +1,8 @@
 package com.optimagrowth.license.config;
 
 import com.optimagrowth.license.security.BearerTokenProvider;
+import com.optimagrowth.license.utils.UserContext;
+import com.optimagrowth.license.utils.UserContextHolder;
 import feign.RequestInterceptor;
 import feign.codec.ErrorDecoder;
 import org.springframework.context.MessageSource;
@@ -24,6 +26,28 @@ public class FeignConfig {
 
             if (token != null) {
                 requestTemplate.header(HttpHeaders.AUTHORIZATION, "Bearer " + token);
+            }
+        };
+    }
+
+    // Mirrors UserContextInterceptor (used on the RestTemplate path) so the
+    // Feign path also forwards correlation-id/user-id/organization-id downstream.
+    @Bean
+    public RequestInterceptor userContextRequestInterceptor() {
+        return requestTemplate -> {
+            UserContext context = UserContextHolder.getContext();
+
+            if (context.getCorrelationId() != null) {
+                requestTemplate.header("correlation-id", context.getCorrelationId());
+            }
+            if (context.getUserId() != null) {
+                requestTemplate.header("user-id", context.getUserId());
+            }
+            if (context.getAuthToken() != null) {
+                requestTemplate.header("auth-token", context.getAuthToken());
+            }
+            if (context.getOrganizationId() != null) {
+                requestTemplate.header("organization-id", context.getOrganizationId());
             }
         };
     }

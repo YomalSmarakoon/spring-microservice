@@ -5,7 +5,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-<!--        <version>4.0.0-SNAPSHOT</version>-->
+        <!--        <version>4.0.0-SNAPSHOT</version>-->
         <version>3.5.6</version>
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
@@ -29,7 +29,6 @@
     </scm>
     <properties>
         <java.version>17</java.version>
-        <docker.image.prefix>ostock</docker.image.prefix>
         <spring-cloud.version>2025.0.0</spring-cloud.version>
         <resilience4j.version>2.3.0</resilience4j.version>
     </properties>
@@ -94,10 +93,16 @@
             <artifactId>spring-cloud-starter-openfeign</artifactId>
         </dependency>
 
+        <!-- Wraps Feign calls in Micrometer Observations so Brave can inject B3 trace headers -->
+        <dependency>
+            <groupId>io.github.openfeign</groupId>
+            <artifactId>feign-micrometer</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>io.github.resilience4j</groupId>
             <artifactId>resilience4j-spring-boot3</artifactId>
-<!--            <version>${resilience4j.version}</version>-->
+            <!--            <version>${resilience4j.version}</version>-->
         </dependency>
 
         <!--<dependency>
@@ -150,6 +155,29 @@
             <artifactId>spring-boot-starter-cache</artifactId>
         </dependency>
 
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-tracing-bridge-brave</artifactId>
+        </dependency>
+
+        <!--Zipkin dependencies-->
+        <dependency>
+            <groupId>io.zipkin.reporter2</groupId>
+            <artifactId>zipkin-reporter-brave</artifactId>
+        </dependency>
+
+        <!-- Populates traceId/spanId into SLF4J MDC so log lines can be correlated to Zipkin traces -->
+        <dependency>
+            <groupId>io.zipkin.brave</groupId>
+            <artifactId>brave-context-slf4j</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>net.logstash.logback</groupId>
+            <artifactId>logstash-logback-encoder</artifactId>
+            <version>8.0</version>
+        </dependency>
+
     </dependencies>
 
     <dependencyManagement>
@@ -193,29 +221,6 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
-            </plugin>
-            <!-- This plugin is used to create a Docker image & publish it to Docker hub -->
-            <plugin>
-                <groupId>com.spotify</groupId>
-                <artifactId>dockerfile-maven-plugin</artifactId>
-                <version>1.4.13</version>
-                <configuration>
-                    <repository>${docker.image.prefix}/${project.artifactId}</repository>
-                    <tag>${project.version}</tag>
-                    <buildArgs>
-                        <JAR_FILE>target/${project.build.finalName}.jar</JAR_FILE>
-                    </buildArgs>
-                </configuration>
-                <executions>
-                    <execution>
-                        <id>default</id>
-                        <phase>install</phase>
-                        <goals>
-                            <goal>build</goal>
-                            <goal>push</goal>
-                        </goals>
-                    </execution>
-                </executions>
             </plugin>
             <plugin>
                 <groupId>org.springframework.boot</groupId>

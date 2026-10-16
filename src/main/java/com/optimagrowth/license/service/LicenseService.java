@@ -11,6 +11,8 @@ import com.optimagrowth.license.model.dto.orgnization.OrganizationResponse;
 import com.optimagrowth.license.repository.LicenseRepository;
 import com.optimagrowth.license.utils.UserContextHolder;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -48,6 +50,9 @@ public class LicenseService {
     // all organization lookups go through the cache-or-fetch path transparently.
     @Autowired
     private OrganizationCacheClient organizationCacheClient;
+
+    @Autowired
+    private ObservationRegistry observationRegistry;
 
     private final AtomicInteger counter = new AtomicInteger(0); // for testing retry
 
@@ -91,28 +96,37 @@ public class LicenseService {
 
         LOG.info("getLicense; Correlation id: {}", UserContextHolder.getContext().getCorrelationId());
 
-        License license = licenseRepository.findByOrganizationIdAndLicenseId(organizationId, licenseId);
-        if (null == license) {
-            throw new IllegalArgumentException(String.format(
-                    messageSource.getMessage("license.search.error.message", null, null),
-                    licenseId, organizationId));
-        }
+        // Custom business span: nests under the auto-instrumented HTTP span for this
+        // request and wraps the org-service call (retrieveOrganizationInfo) as its own
+        // child span, so both show up named/tagged in Zipkin instead of as one opaque call.
+        return Observation.createNotStarted("license.getLicense", observationRegistry)
+                .lowCardinalityKeyValue("organizationId", organizationId)
+                .lowCardinalityKeyValue("licenseId", licenseId)
+                .lowCardinalityKeyValue("clientType", clientType)
+                .observe(() -> {
+                    License license = licenseRepository.findByOrganizationIdAndLicenseId(organizationId, licenseId);
+                    if (null == license) {
+                        throw new IllegalArgumentException(String.format(
+                                messageSource.getMessage("license.search.error.message", null, null),
+                                licenseId, organizationId));
+                    }
 
-        license.withComment(config.getProperty());
+                    license.withComment(config.getProperty());
 
-        LicenseResponse licenseResponse = new LicenseResponse(license);
+                    LicenseResponse licenseResponse = new LicenseResponse(license);
 
-        // retrieve org info based on clientType (Feign / RestTemplate / WebClient)
-        OrganizationResponse organization = retrieveOrganizationInfo(organizationId, clientType);
+                    // retrieve org info based on clientType (Feign / RestTemplate / WebClient)
+                    OrganizationResponse organization = retrieveOrganizationInfo(organizationId, clientType);
 
-        // populate organization fields into the license
-        if (null != organization) {
-            licenseResponse.setOrganizationName(organization.getName());
-            licenseResponse.setContactName(organization.getContactName());
-            licenseResponse.setContactEmail(organization.getContactEmail());
-            licenseResponse.setContactPhone(organization.getContactPhone());
-        }
-        return licenseResponse;
+                    // populate organization fields into the license
+                    if (null != organization) {
+                        licenseResponse.setOrganizationName(organization.getName());
+                        licenseResponse.setContactName(organization.getContactName());
+                        licenseResponse.setContactEmail(organization.getContactEmail());
+                        licenseResponse.setContactPhone(organization.getContactPhone());
+                    }
+                    return licenseResponse;
+                });
     }
 
 
